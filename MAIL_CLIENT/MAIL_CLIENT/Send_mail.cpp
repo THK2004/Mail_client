@@ -1,6 +1,13 @@
 #include "Send_mail.h"
 
-int send_mail(string sender, vector<string> toReceiver, vector<string> ccReceiver, vector<string> bccReceiver, vector<string> filename) {
+int send_mail(
+    string sender_name,
+    string sender_addr, 
+    vector<string> toReceiver, 
+    vector<string> ccReceiver, 
+    vector<string> bccReceiver, 
+    vector<string> filename
+) {
     int toReceivers = (int)toReceiver.size();
     int ccReceivers = (int)ccReceiver.size();
     int bccReceivers = (int)bccReceiver.size();
@@ -31,6 +38,7 @@ int send_mail(string sender, vector<string> toReceiver, vector<string> ccReceive
         std::cerr << "Failed to connect to the server." << std::endl;
         closesocket(clientSocket);
         WSACleanup();
+        system("pause");
         return 1;
     }
 
@@ -41,26 +49,17 @@ int send_mail(string sender, vector<string> toReceiver, vector<string> ccReceive
         std::cerr << "Failed to receive server message." << std::endl;
         closesocket(clientSocket);
         WSACleanup();
+        system("pause");
         return 1;
     }
     std::cout << "Server: " << serverMessage;
     memset(serverMessage, '\0', sizeof(serverMessage));
 
-    //get file
-    ifstream ifs("FileToSend/Test.txt", std::ios::binary);
-    if (!ifs) {
-        std::cerr << "Fail to open file";
-        closesocket(clientSocket);
-        WSACleanup();
-        system("pause");
-        return 1;
-    }
-    string attachmentContent((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-    ifs.close();
-    string encodedAttachment = base64_encode(attachmentContent);
+    //get data
+    vector<string> encodedDataS = getEncodedData(filename);
 
     //MailFromCommand
-    string mailFromCommand = "MAIL FROM: <" + sender + ">\r\n";
+    string mailFromCommand = "MAIL FROM: <" + sender_addr + ">\r\n";
 
     //MailContent
     string to;
@@ -77,26 +76,53 @@ int send_mail(string sender, vector<string> toReceiver, vector<string> ccReceive
     }
     string boundary = "boundary";
     string getDate = getTimeUTCplus7();
-    string mailContent =
+    string mailMessage =
         "Content-Type: multipart/mixed; boundary=\"" + boundary + "\"\r\n"
         "Date: " + getDate + "\r\n"
         "MIME-Version: 1.0\r\n"
         "To: " + to + "\r\n"
         "Cc: " + cc + "\r\n"
-        "From: Khanh Tran <" + sender + ">\r\n"
-        "Subject: Test sending attached mail with code\r\n\r\n"
+        "From: " + sender_name + " <" + sender_addr + ">\r\n"
+        "Subject: Test sending 3 item-attached mail with code\r\n\r\n"
         "This is a multi-part message in MIME format.\r\n"
         "--" + boundary + "\r\n"
-        "Content-Type: text/plain\r\n\r\n"
-        "This is a test email.\r\nHello\r\nHow are you\r\n\r\n"
-        "--" + boundary + "\r\n"
-        "Content-Type: text/plain; charset=UTF-8; name=\"Test.txt\"\r\n"
-        "Content-Disposition: attachment; filename=\"Test.txt\"\r\n"
-        "Content-Transfer-Encoding: base64\r\n\r\n"
-        + encodedAttachment + "\r\n"
+        "Content-Type: text/plain; charset=UTF-8; format=flowed\r\n\r\n"
+        "This is a test email.\r\nHello\r\nHow are you\r\n\r\n";
+
+    string attachment;
+    for (int i = 0; i < filenames; i++) {
+        int pos = (int)filename[i].find(".");
+        string typeOfFile = filename[i].substr(pos);
+
+        attachment += "--" + boundary + "\r\n";
+        if (typeOfFile == ".pdf") {
+            attachment += "Content-Type: application/pdf; name=\"" + filename[i] + "\"\r\n";
+        }
+        else if (typeOfFile == ".txt") {
+            attachment += "Content-Type: text/plain; charset=UTF-8; name=\"" + filename[i] + "\"\r\n";
+        }
+        else if (typeOfFile == ".docx") {
+            attachment +=
+                "Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document;\r\n"
+                "name=\"" + filename[i] + "\"\r\n";
+        }
+        else if (typeOfFile == ".jpg") {
+            attachment += "Content-Type: image/jpeg; name=\"" + filename[i] + "\"\r\n";
+        }
+        else if (typeOfFile == ".zip") {
+            attachment += "Content-Type: application/x-zip-compressed; name=\"" + filename[i] + "\"\r\n";
+        }
+        attachment +=
+            "Content-Disposition: attachment; filename=\"" + filename[i] + "\"\r\n"
+            "Content-Transfer-Encoding: base64\r\n\r\n"
+            + encodedDataS[i] + "\r\n";
+    }
+
+    string ending = 
         "\r\n--" + boundary + "--\r\n"
         ".\r\n";
 
+    string mailContent = mailMessage + attachment + ending;
 
     //Full mail
     vector<string> mail = {
@@ -109,12 +135,35 @@ int send_mail(string sender, vector<string> toReceiver, vector<string> ccReceive
     };
 
     //RCPTTOCommand
+    vector<string> RCPT;
+    for (int i = 0; i < toReceivers; i++) {
+        if (std::find(RCPT.begin(), RCPT.end(), toReceiver[i]) == RCPT.end()) {
+            RCPT.push_back(toReceiver[i]);
+        }
+    }
+    for (int i = 0; i < ccReceivers; i++) {
+        if (std::find(RCPT.begin(), RCPT.end(), ccReceiver[i]) == RCPT.end()) {
+            RCPT.push_back(ccReceiver[i]);
+        }
+    }
+    for (int i = 0; i < bccReceivers; i++) {
+        if (std::find(RCPT.begin(), RCPT.end(), bccReceiver[i]) == RCPT.end()) {
+            RCPT.push_back(bccReceiver[i]);
+        }
+    }
+    int RCPT_size = (int)RCPT.size();
+    for (int i = 0; i < RCPT_size; i++) {
+        mail.insert(mail.begin() + i + 2, "RCPT TO: <" + RCPT[i] + ">\r\n");
+    }
+
+    /*
     for (int i = bccReceivers - 1; i >= 0; i--)
         mail.insert(mail.begin() + 2, "RCPT TO: <" + bccReceiver[i] + ">\r\n");
     for (int i = ccReceivers - 1; i >= 0; i--)
         mail.insert(mail.begin() + 2, "RCPT TO: <" + ccReceiver[i] + ">\r\n");
     for (int i = toReceivers - 1; i >= 0; i--)
         mail.insert(mail.begin() + 2, "RCPT TO: <" + toReceiver[i] + ">\r\n");
+    */
 
     //Communicate with server
     int numOfMessage = (int)mail.size();
@@ -124,6 +173,7 @@ int send_mail(string sender, vector<string> toReceiver, vector<string> ccReceive
             std::cerr << "Failed to send message." << std::endl;
             closesocket(clientSocket);
             WSACleanup();
+            system("pause");
             return 1;
         }
         std::cout << "CLIENT: " << mail[i];
@@ -133,6 +183,7 @@ int send_mail(string sender, vector<string> toReceiver, vector<string> ccReceive
             std::cerr << "Failed to receive server message." << std::endl;
             closesocket(clientSocket);
             WSACleanup();
+            system("pause");
             return 1;
         }
 
@@ -190,4 +241,45 @@ string getTimeUTCplus7() {
     smtpFormattedDate << std::put_time(&gmTime, "%a, %d %b %Y %H:%M:%S %z");
 
     return smtpFormattedDate.str();
+}
+
+vector<string> getEncodedData(vector<string> filename) {
+    int n = (int)filename.size();
+    if (n == 0) {
+        return vector<string>();
+    }
+
+    vector<string> encodedDataS;
+    string path = "FileToSend/";
+
+    for (int i = 0; i < n; i++) {
+        ifstream ifs(path + filename[i], std::ios::binary);
+        if (!ifs) {
+            std::cerr << "Fail to open file";
+            system("pause");
+            exit(1);
+        }
+        string attachmentContent((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+        ifs.close();
+        string encodedAttachment = base64_encode(attachmentContent);
+
+        int lastEle = (int)encodedAttachment.size() - 1;
+        if (lastEle % 72 != 0) {
+            while (lastEle % 72 != 0) {
+                lastEle--;
+            }
+            for (int j = lastEle; j > 0; j -= 72) {
+                encodedAttachment.insert(j, "\r\n");
+            }
+        }
+        else {
+            for (int j = lastEle - 72; j > 0; j -= 72) {
+                encodedAttachment.insert(j, "\r\n");
+            }
+        }
+
+        encodedDataS.push_back(encodedAttachment);
+    }
+
+    return encodedDataS;
 }
