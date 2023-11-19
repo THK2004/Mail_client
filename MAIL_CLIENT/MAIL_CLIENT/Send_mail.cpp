@@ -6,7 +6,9 @@ int send_mail(
     vector<string> toReceiver, 
     vector<string> ccReceiver, 
     vector<string> bccReceiver, 
-    vector<string> filename
+    vector<string> filename,
+    string subject,
+    string content
 ) {
     int toReceivers = (int)toReceiver.size();
     int ccReceivers = (int)ccReceiver.size();
@@ -17,7 +19,7 @@ int send_mail(
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         std::cerr << "Failed to initialize Winsock." << std::endl;
-        return 1;
+        exit(1);
     }
 
     // Create a socket
@@ -25,7 +27,7 @@ int send_mail(
     if (clientSocket == INVALID_SOCKET) {
         std::cerr << "Failed to create socket." << std::endl;
         WSACleanup();
-        return 1;
+        exit(1);
     }
 
     // Connect to the SMTP server
@@ -39,7 +41,7 @@ int send_mail(
         closesocket(clientSocket);
         WSACleanup();
         system("pause");
-        return 1;
+        exit(1);
     }
 
     char serverMessage[1024];
@@ -57,6 +59,18 @@ int send_mail(
 
     //get data
     vector<string> encodedDataS = getEncodedData(filename);
+    if (filenames != encodedDataS.size()) {
+        std::cerr << "Fail to get encoded data." << std::endl;
+        closesocket(clientSocket);
+        WSACleanup();
+        system("pause");
+        exit(1);
+    }
+    for (int i = 0; i < filenames; i++) {
+        if (calBase64EncodedSize_bytes(encodedDataS[i]) > 5242880) {
+            std::cout << "Oops! The " + filename[i] + " exceeds 5MB." << std::endl;
+        }
+    }
 
     //MailFromCommand
     string mailFromCommand = "MAIL FROM: <" + sender_addr + ">\r\n";
@@ -83,11 +97,11 @@ int send_mail(
         "To: " + to + "\r\n"
         "Cc: " + cc + "\r\n"
         "From: " + sender_name + " <" + sender_addr + ">\r\n"
-        "Subject: Test sending 3 item-attached mail with code\r\n\r\n"
+        "Subject: " + subject + "\r\n\r\n"
         "This is a multi-part message in MIME format.\r\n"
         "--" + boundary + "\r\n"
         "Content-Type: text/plain; charset=UTF-8; format=flowed\r\n\r\n"
-        "This is a test email.\r\nHello\r\nHow are you\r\n\r\n";
+        "" + content + "\r\n";
 
     string attachment;
     for (int i = 0; i < filenames; i++) {
@@ -156,15 +170,6 @@ int send_mail(
         mail.insert(mail.begin() + i + 2, "RCPT TO: <" + RCPT[i] + ">\r\n");
     }
 
-    /*
-    for (int i = bccReceivers - 1; i >= 0; i--)
-        mail.insert(mail.begin() + 2, "RCPT TO: <" + bccReceiver[i] + ">\r\n");
-    for (int i = ccReceivers - 1; i >= 0; i--)
-        mail.insert(mail.begin() + 2, "RCPT TO: <" + ccReceiver[i] + ">\r\n");
-    for (int i = toReceivers - 1; i >= 0; i--)
-        mail.insert(mail.begin() + 2, "RCPT TO: <" + toReceiver[i] + ">\r\n");
-    */
-
     //Communicate with server
     int numOfMessage = (int)mail.size();
     for (int i = 0; i < numOfMessage; i++) {
@@ -174,7 +179,7 @@ int send_mail(
             closesocket(clientSocket);
             WSACleanup();
             system("pause");
-            return 1;
+            exit(1);
         }
         std::cout << "CLIENT: " << mail[i];
 
@@ -184,7 +189,7 @@ int send_mail(
             closesocket(clientSocket);
             WSACleanup();
             system("pause");
-            return 1;
+            exit(1);
         }
 
         std::cout << "SERVER: " << serverMessage;
@@ -282,4 +287,12 @@ vector<string> getEncodedData(vector<string> filename) {
     }
 
     return encodedDataS;
+}
+
+unsigned long long calBase64EncodedSize_bytes(string encodedData) {
+    unsigned long long n = encodedData.size();
+    unsigned long long bytes = n / 4 * 3;
+    if (encodedData[n - 2] == '=') return bytes - 2;
+    if (encodedData[n - 1] == '=') return bytes - 1;
+    return bytes;
 }

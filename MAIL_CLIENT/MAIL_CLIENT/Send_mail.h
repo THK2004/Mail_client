@@ -9,13 +9,16 @@
 #include <algorithm>
 
 int send_mail(
-	string sender_name, 
-	string sender_addr, 
+	string sender_name,
+	string sender_addr,
 	vector<string> toReceiver,
 	vector<string> ccReceiver,
-	vector<string> bccReceiver, 
-	vector<string> filename
+	vector<string> bccReceiver,
+	vector<string> filename,
+	string subject,
+	string content
 );
 string base64_encode(const string&);
 string getTimeUTCplus7();
 vector<string> getEncodedData(vector<string> filename);
+unsigned long long calBase64EncodedSize_bytes(string encodedData);
