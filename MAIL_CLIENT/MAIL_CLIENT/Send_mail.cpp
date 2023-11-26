@@ -1,8 +1,10 @@
 #include "Send_mail.h"
 
-int send_mail(
+void send_mail(
     string sender_name,
-    string sender_addr, 
+    string sender_addr,
+    int smtp_server_port,
+    string smtp_server_addr,
     vector<string> toReceiver, 
     vector<string> ccReceiver, 
     vector<string> bccReceiver, 
@@ -14,6 +16,9 @@ int send_mail(
     int ccReceivers = (int)ccReceiver.size();
     int bccReceivers = (int)bccReceiver.size();
     int filenames = (int)filename.size();
+
+    std::wstring stemp = std::wstring(smtp_server_addr.begin(), smtp_server_addr.end());
+    LPCWSTR server_addr = stemp.c_str();
 
     // Initialize Winsock
     WSADATA wsaData;
@@ -33,8 +38,8 @@ int send_mail(
     // Connect to the SMTP server
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(2500);  // SMTP port
-    InetPton(AF_INET, TEXT("127.0.0.1"), &serverAddress.sin_addr.s_addr);  // Local server address
+    serverAddress.sin_port = htons(smtp_server_port);  // SMTP port
+    InetPton(AF_INET, server_addr, &serverAddress.sin_addr.s_addr);  // Local server address
 
     if (connect(clientSocket, (sockaddr*)(&serverAddress), sizeof(serverAddress)) == SOCKET_ERROR) {
         std::cerr << "Failed to connect to the server." << std::endl;
@@ -44,7 +49,7 @@ int send_mail(
         exit(1);
     }
 
-    char serverMessage[1024];
+    char serverMessage[BUFFER_SIZE];
     memset(serverMessage, '\0', sizeof(serverMessage));
     // Receive the server's welcome message
     if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
@@ -52,9 +57,9 @@ int send_mail(
         closesocket(clientSocket);
         WSACleanup();
         system("pause");
-        return 1;
+        exit(1);
     }
-    std::cout << "Server: " << serverMessage;
+    std::cout << "SERVER: " << serverMessage;
     memset(serverMessage, '\0', sizeof(serverMessage));
 
     //get data
@@ -73,6 +78,7 @@ int send_mail(
     }
 
     //MailFromCommand
+    string EHLOCommand = "EHLO " + smtp_server_addr + "\r\n";
     string mailFromCommand = "MAIL FROM: <" + sender_addr + ">\r\n";
 
     //MailContent
@@ -140,7 +146,7 @@ int send_mail(
 
     //Full mail
     vector<string> mail = {
-        "EHLO localhost\r\n",
+        EHLOCommand,
         mailFromCommand,
         //RCPT TO COMMAND
         "DATA\r\n",
@@ -199,7 +205,7 @@ int send_mail(
     // Close the socket and cleanup
     closesocket(clientSocket);
     WSACleanup();
-    return 0;
+    return;
 }
 
 string base64_encode(const string& input) {

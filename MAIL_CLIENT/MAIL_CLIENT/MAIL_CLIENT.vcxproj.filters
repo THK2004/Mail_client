@@ -21,12 +21,18 @@
     <ClCompile Include="Send_mail.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Recv_mail.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Header.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Send_mail.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Recv_mail.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

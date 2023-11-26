@@ -1,16 +1,18 @@
 #pragma once
 #include "Header.h"
-#include <WinSock2.h>
-#include <Ws2tcpip.h>
 #include <fstream>
 #include <sstream>
 #include <chrono>
 #include <iomanip>
 #include <algorithm>
+#include <WinSock2.h>
+#include <Ws2tcpip.h>
 
-int send_mail(
+void send_mail(
 	string sender_name,
 	string sender_addr,
+	int smtp_server_port,
+	string smtp_server_addr,
 	vector<string> toReceiver,
 	vector<string> ccReceiver,
 	vector<string> bccReceiver,
