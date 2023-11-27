@@ -145,21 +145,35 @@ void recv_mail(
             memset(serverMessage, '\0', sizeof(serverMessage));
         }
         else if (clientRequests[i].substr(0, 4) == "RETR") {
-            string mailOrder = clientRequests[i].substr(clientRequests[i].find(' ') + 1, clientRequests[i].size() - 1);
-            unsigned long long mailBytes = mailOrderAndItsByte[std::stoi(mailOrder) - 1].second;
-            char* buffer = new char[mailBytes + 1000];
-            for (int i = (int)mailBytes; i < mailBytes + 1000; i++) {
-                buffer[i] = '\0';
-            }
-            if (recv(clientSocket, buffer, (int)mailBytes + 1000, 0) == SOCKET_ERROR) {
-                std::cerr << "Failed to receive server message." << std::endl;
-                closesocket(clientSocket);
-                WSACleanup();
-                system("pause");
-                exit(1);
-            }
+            //string mailOrder = clientRequests[i].substr(clientRequests[i].find(' ') + 1, clientRequests[i].size() - 1);
+            char buffer[BUFFER_SIZE];
+            int bytesRead = 0;
+            string mailContent;
+            string previousBuffer;
+            do {
+                bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
+                if (bytesRead > 0) {
+                    buffer[bytesRead] = '\0';
+                    mailContent += buffer;
+                    string combinedbuffer = previousBuffer + buffer;
+                    if (combinedbuffer.find("\r\n.\r\n") != std::string::npos ) {
+                         break;
+                    }
+                    previousBuffer = buffer;
+                }
+                else if (bytesRead == 0) {
+                    break;
+                }
+                else {
+                    std::cerr << "Failed to receive data from server." << std::endl;
+                    closesocket(clientSocket);
+                    WSACleanup();
+                    system("pause");
+                    exit(1);
+                }
+            } while (bytesRead > 0);
 
-            std::cout << "SERVER: " << buffer;
+            std::cout << "SERVER: " << mailContent;
 
             string path = "Mailbox/";
             string filter = "Inbox/";
@@ -179,28 +193,23 @@ void recv_mail(
             }
             string filename(timeString);
 
-            //remove '\r' from buffer
-            tmp = strlen(buffer);
-            size_t j = 0;
-            for (size_t i = 0; i < tmp; i++) {
-                if (buffer[i] != '\r')
-                    buffer[j++] = buffer[i];
+            //remove '\r' from mailContent
+            tmp = mailContent.find('\r');
+            while (tmp != std::string::npos) {
+                mailContent.erase(tmp, 1);
+                tmp = mailContent.find('\r', tmp);
             }
-            buffer[j] = '\0';
-
+            
             //remove +OK line from buffer
-            tmp = strlen(buffer);
-            j = 0;
-            for (j = 0; j < tmp; j++) {
-                if (buffer[j] == '\n') {
-                    break;
-                }
+            tmp = mailContent.find('\n');
+            if (tmp != std::string::npos) {
+                mailContent.erase(0, tmp + 1);
             }
-            std::memmove(buffer, buffer + j + 1, tmp - j);
 
             //remove . from last line
-            tmp = strlen(buffer);
-            buffer[tmp - 2] = '\0';
+            if (mailContent.size() >= 2) {
+                mailContent.erase(mailContent.size() - 2);
+            }
 
             //Create a user folder if not created;
             createUserFolderAndItsSubFolder(user_addr);
@@ -211,10 +220,9 @@ void recv_mail(
                 std::cerr << "Failed to open .msg file to write mail content down\n";
             }
 
-            ofs << buffer;
+            ofs << mailContent;
 
             ofs.close();
-            delete[] buffer;
         }
         else {
             if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
@@ -273,4 +281,39 @@ void createUserFolderAndItsSubFolder(string user_addr) {
             std::wcout << L"Failed to create folder " << subfolder[i] << L". Error code: " << errorCode << std::endl;
         }
     }
+}
+
+std::string base64Decode(const std::string& base64String) {
+    const std::string base64Chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    std::string decodedString;
+    int val = 0, valb = -8;
+    for (char c : base64String)
+    {
+        if (c == '=')
+            break;
+        if (c >= 'A' && c <= 'Z')
+            c -= 'A';
+        else if (c >= 'a' && c <= 'z')
+            c -= 'a' - 26;
+        else if (c >= '0' && c <= '9')
+            c -= '0' - 52;
+        else if (c == '+')
+            c = 62;
+        else if (c == '/')
+            c = 63;
+        else
+            continue;
+
+        val = (val << 6) + c;
+        valb += 6;
+        if (valb >= 0)
+        {
+            decodedString.push_back(char((val >> valb) & 0xFF));
+            valb -= 8;
+        }
+    }
+
+    return decodedString;
 }

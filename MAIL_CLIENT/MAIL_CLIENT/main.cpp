@@ -13,8 +13,8 @@ int main() {
     vector<string> toReceiver = { "receiver@yahoo.com.vn" };
     vector<string> ccReceiver = { "receiver2@gmail.com" };
     vector<string> bccReceiver = { "receiver3@whatisthis.org" };
-    vector<string> filename = { "Test.txt", "Test.zip", "Test.docx"};   //There is a 5MB file check
-    string subject = "Test sending 3 item-attached mail with code";
+    vector<string> filename = { "Test.pdf" };   //There is a 1MB file check
+    string subject = "Test sending 1 .pdf-item-attached mail with code to try download";
     string content =
         "This is a test email.\r\n"
         "Hello\r\n"
@@ -27,7 +27,7 @@ int main() {
     string pop3_server_addr = "127.0.0.1";
     string userMailAddr = "receiver@yahoo.com.vn";
     string password = "123456789";
-    int mailOrderToRecv = 5;
+    int mailOrderToRecv = 6;
     
     recv_mail(user_addr, pop3_server_port, pop3_server_addr, userMailAddr, password, mailOrderToRecv);
 

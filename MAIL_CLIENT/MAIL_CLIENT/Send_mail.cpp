@@ -72,8 +72,8 @@ void send_mail(
         exit(1);
     }
     for (int i = 0; i < filenames; i++) {
-        if (calBase64EncodedSize_bytes(encodedDataS[i]) > 5242880) {
-            std::cout << "Oops! The " + filename[i] + " exceeds 5MB." << std::endl;
+        if (calBase64EncodedSize_bytes(encodedDataS[i]) > 1048576) {
+            std::cout << "Oops! The " + filename[i] + " exceeds 1MB." << std::endl;
         }
     }
 

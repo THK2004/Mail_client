@@ -16,3 +16,4 @@ void recv_mail(
 );
 
 void createUserFolderAndItsSubFolder(string user_addr);
+std::string base64Decode(const std::string& base64String);
