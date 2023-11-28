@@ -175,9 +175,6 @@ void recv_mail(
 
             std::cout << "SERVER: " << mailContent;
 
-            string path = "Mailbox/";
-            string filter = "Inbox/";
-
             //Get time to make file name
             auto now = std::chrono::system_clock::now();
             std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
@@ -214,8 +211,13 @@ void recv_mail(
             //Create a user folder if not created;
             createUserFolderAndItsSubFolder(user_addr);
 
-            //Write down buffer to file
-            ofstream ofs(path + user_addr + "/" + filter + filename + ".msg");
+            //Create file path
+            string path = "Mailbox/";
+            string filter = "Inbox/";
+            string filepath = path + user_addr + "/" + filter;
+
+            //Write down buffer to .msg file
+            ofstream ofs(filepath + filename + ".msg");
             if (!ofs.is_open()) {
                 std::cerr << "Failed to open .msg file to write mail content down\n";
             }
@@ -223,6 +225,9 @@ void recv_mail(
             ofs << mailContent;
 
             ofs.close();
+            
+            //Save file from mail
+            savefiles(filepath, mailContent);
         }
         else {
             if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
@@ -316,4 +321,166 @@ std::string base64Decode(const std::string& base64String) {
     }
 
     return decodedString;
+}
+
+void savefiles(string filepath, string mailContent) {
+    vector<pair<string, size_t>> listOfAttachedFileNameAndTheirPos;         //list of filename include what after '.' (ex: .pdf)
+
+    size_t pos = mailContent.find("Content-Disposition: attachment");
+    while (pos != std::string::npos) {
+        string filename;
+        size_t start_filename = mailContent.find('=', pos + 1);
+        size_t end_filename = mailContent.find('\n', pos + 1);
+        for (size_t i = start_filename + 2; i < end_filename - 1; i++) {
+            filename += mailContent[i];
+        }
+        size_t startDataIndex = mailContent.find('\n', mailContent.find("Content-Transfer-Encoding: base64", pos + 1));
+        listOfAttachedFileNameAndTheirPos.push_back(std::make_pair(filename, startDataIndex + 2));
+
+        pos = mailContent.find("Content-Disposition: attachment", pos + 1);
+    }
+
+    size_t numOfAttachedFile = listOfAttachedFileNameAndTheirPos.size();
+
+    std::cout << "\nThere is/are " << numOfAttachedFile << " attached item(s) in the mail:\n";
+    for (int i = 0; i < numOfAttachedFile; i++) {
+        std::cout << i + 1 << ". " << listOfAttachedFileNameAndTheirPos[i].first << endl;
+    }
+    
+    bool isLooping = 1;
+    while (isLooping) {
+        cout << "Which one do you want to save?\n("
+                "If more than 1, use '+' to demmand. Ex: 2+5+1 to download\n"
+                "file 2nd, 5th, 1st in order. If none, enter 0): ";
+        string command;
+        cin >> command;
+        size_t size = command.size();
+
+        if (size % 2 == 0) {
+            cout << "Wrong input.\n";
+            isLooping = 1;
+        }
+        else if (size == 1) {
+            if (isalpha(command[0])) {
+                cout << "Wrong input.\n";
+                isLooping = 1;
+            }
+            else if (isdigit(command[0])) {
+                if (command[0] - 48 == 0) {
+                    isLooping = 0;
+                }
+                else if (command[0] - 48 > numOfAttachedFile) {
+                    cout << "There is no such file.\n";
+                    isLooping = 1;
+                }
+                else {
+                    //Get file a command[0]
+                    string filefullname = listOfAttachedFileNameAndTheirPos[command[0] - 48 - 1].first;
+                    string filetype = filefullname.substr(filefullname.find('.'));              //.pdf or something
+                    string filename = filefullname.substr(0, filefullname.find('.'));
+                    string uniquefilename = generateUniqueFileNameWhenDownload(filename, filetype);
+                    size_t start = listOfAttachedFileNameAndTheirPos[command[0] - 48 - 1].second;
+                    size_t end = mailContent.find("--", start);
+                    string base64Data;
+                    if (command[0] - 48 != numOfAttachedFile) {
+                        base64Data = mailContent.substr(start, end - start);
+                    }
+                    else {
+                        base64Data = mailContent.substr(start, end - start - 1);
+                    }
+                    isLooping = 0;
+                    string decodedBase64Data = base64Decode(base64Data);
+
+                    ofstream ofs("Download/" + uniquefilename + filetype, std::ios::binary);
+
+                    if (!ofs) {
+                        cout << "Cannot open download file path";
+                        return;
+                    }
+
+                    ofs << decodedBase64Data;
+
+                    ofs.close();
+
+                    isLooping = 0;
+                }
+            }
+        }
+        else {
+            bool isWrong = 0;
+            if (!isdigit(command[0])) {
+                cout << "Wrong input.\n";
+                isLooping = 1;
+                isWrong = 1;
+            }
+            if (!isWrong) {
+                for (int i = 2, j = 1; i < size && j < size; i += 2, j += 2) {
+                    if (!isdigit(command[i]) || command[j] != '+') {
+                        cout << "Wrong input.\n";
+                        isLooping = 1;
+                        isWrong = 1;
+                        break;
+                    }
+                }
+            }
+            if (!isWrong) {
+                for (int i = 0; i < size; i += 2) {
+                    if (command[i] - 48 > numOfAttachedFile) {
+                        cout << "There is a non-existing option in your command.\n";
+                        isLooping = 1;
+                        isWrong = 1;
+                        break;
+                    }
+                }
+            }
+            if (!isWrong) {
+                for (int i = 0; i < size; i += 2) {
+                    //get file at command[i]
+                    string filefullname = listOfAttachedFileNameAndTheirPos[command[i] - 48 - 1].first;
+                    string filetype = filefullname.substr(filefullname.find('.'));              //.pdf or something
+                    string filename = filefullname.substr(0, filefullname.find('.'));
+                    string uniquefilename = generateUniqueFileNameWhenDownload(filename, filetype);
+                    size_t start = listOfAttachedFileNameAndTheirPos[command[i] - 48 - 1].second;
+                    size_t end = mailContent.find("--", start);
+                    string base64Data;
+                    if (command[0] - 48 != numOfAttachedFile) {
+                        base64Data = mailContent.substr(start, end - start);
+                    }
+                    else {
+                        base64Data = mailContent.substr(start, end - start - 1);
+                    }
+                    isLooping = 0;
+                    string decodedBase64Data = base64Decode(base64Data);
+
+                    ofstream ofs("Download/" + uniquefilename + filetype, std::ios::binary);
+
+                    if (!ofs) {
+                        cout << "Cannot open download file path";
+                        return;
+                    }
+
+                    ofs << decodedBase64Data;
+
+                    ofs.close();
+                }
+
+                isLooping = 0;
+            }
+
+        }
+    }
+
+    //Continue
+}
+
+std::string generateUniqueFileNameWhenDownload(const std::string& filename, const std::string& filetype) {
+    std::string uniqueName = filename;
+    int counter = 1;
+
+    while (std::ifstream("Download/" + uniqueName + filetype).good()) {
+        uniqueName = filename + " (" + std::to_string(counter) + ")";
+        counter++;
+    }
+
+    return uniqueName;
 }

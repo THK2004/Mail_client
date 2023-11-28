@@ -17,3 +17,5 @@ void recv_mail(
 
 void createUserFolderAndItsSubFolder(string user_addr);
 std::string base64Decode(const std::string& base64String);
+void savefiles(string filepath, string mailContent);
+std::string generateUniqueFileNameWhenDownload(const std::string& filename, const std::string& filetype);
