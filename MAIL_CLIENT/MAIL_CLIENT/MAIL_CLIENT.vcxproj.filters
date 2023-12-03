@@ -24,6 +24,12 @@
     <ClCompile Include="Recv_mail.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Mail_client.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Header.h">
@@ -35,5 +41,16 @@
     <ClInclude Include="Recv_mail.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Mail_client.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="configFile.xml">
+      <Filter>Resource Files</Filter>
+    </Xml>
   </ItemGroup>
 </Project>

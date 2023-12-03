@@ -22,5 +22,5 @@ void send_mail(
 );
 string base64_encode(const string&);
 string getTimeUTCplus7();
-vector<string> getEncodedData(vector<string> filename);
+vector<string> getEncodedData(vector<string>& filename);
 unsigned long long calBase64EncodedSize_bytes(string encodedData);

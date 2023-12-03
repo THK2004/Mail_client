@@ -127,14 +127,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Config.cpp" />
+    <ClCompile Include="Mail_client.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Recv_mail.cpp" />
     <ClCompile Include="Send_mail.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Config.h" />
     <ClInclude Include="Header.h" />
+    <ClInclude Include="Mail_client.h" />
     <ClInclude Include="Recv_mail.h" />
     <ClInclude Include="Send_mail.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="configFile.xml" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

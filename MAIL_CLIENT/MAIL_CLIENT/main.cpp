@@ -1,11 +1,18 @@
 #pragma comment(lib, "Ws2_32.lib")
-#include "Send_mail.h"
-#include "Recv_mail.h"
+#include "Mail_client.h"
 
 using namespace std;
 
 int main() {
-    //Send_mail
+    //Config
+    string fileConfigName = "configFile.xml";
+    Config configData;
+    configData.readFileXml(fileConfigName);
+
+    //Mail_client
+    mail_client(configData);
+
+    /*
     string user_name = "Khanh Tran";                        //Current login
     string user_addr = "sender@fit.hcmus.edu.vn";           //Current login
     int smtp_server_port = 2500;
@@ -19,6 +26,9 @@ int main() {
         "This is a test email.\r\n"
         "Hello\r\n"
         "How are you\r\n";
+    */
+    //Send_mail
+
 
     /*
     send_mail(
@@ -35,13 +45,17 @@ int main() {
     );
     */
 
-    //Recv_mail
+    /*
     int pop3_server_port = 1100;
     string pop3_server_addr = "127.0.0.1";
     string receiverMailAddr = "receiver@yahoo.com.vn";  //For USER command
     string password = "123456789";                      //For PASS command
     int mailOrderToRecv = 8;
+    */
+    //Recv_mail
+
     
+    /*
     recv_mail(
         user_addr,
         pop3_server_port, 
@@ -50,6 +64,7 @@ int main() {
         password, 
         mailOrderToRecv
     );
+    */
 
     std::cout << endl;
     system("pause");

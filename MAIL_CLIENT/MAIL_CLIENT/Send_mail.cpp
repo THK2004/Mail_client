@@ -15,7 +15,6 @@ void send_mail(
     int toReceivers = (int)toReceiver.size();
     int ccReceivers = (int)ccReceiver.size();
     int bccReceivers = (int)bccReceiver.size();
-    int filenames = (int)filename.size();
 
     std::wstring stemp = std::wstring(smtp_server_addr.begin(), smtp_server_addr.end());
     LPCWSTR server_addr = stemp.c_str();
@@ -59,18 +58,13 @@ void send_mail(
         system("pause");
         exit(1);
     }
-    std::cout << "SERVER: " << serverMessage;
+    //std::cout << "SERVER: " << serverMessage;
     memset(serverMessage, '\0', sizeof(serverMessage));
 
     //get data
     vector<string> encodedDataS = getEncodedData(filename);
-    if (filenames != encodedDataS.size()) {
-        std::cerr << "Fail to get encoded data." << std::endl;
-        closesocket(clientSocket);
-        WSACleanup();
-        system("pause");
-        exit(1);
-    }
+    int filenames = (int)filename.size();
+
     for (int i = 0; i < filenames; i++) {
         if (calBase64EncodedSize_bytes(encodedDataS[i]) > 1048576) {
             std::cout << "Oops! The " + filename[i] + " exceeds 1MB." << std::endl;
@@ -187,7 +181,7 @@ void send_mail(
             system("pause");
             exit(1);
         }
-        std::cout << "CLIENT: " << mail[i];
+        //std::cout << "CLIENT: " << mail[i];
 
         // Receive server's response
         if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
@@ -198,7 +192,7 @@ void send_mail(
             exit(1);
         }
 
-        std::cout << "SERVER: " << serverMessage;
+        //std::cout << "SERVER: " << serverMessage;
         memset(serverMessage, '\0', sizeof(serverMessage));
     }
 
@@ -254,42 +248,43 @@ string getTimeUTCplus7() {
     return smtpFormattedDate.str();
 }
 
-vector<string> getEncodedData(vector<string> filename) {
-    int n = (int)filename.size();
-    if (n == 0) {
+vector<string> getEncodedData(vector<string>& filename) {
+    if (filename.size() == 0) {
         return vector<string>();
     }
 
     vector<string> encodedDataS;
     string path = "FileToSend/";
 
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < filename.size(); i++) {
         ifstream ifs(path + filename[i], std::ios::binary);
         if (!ifs) {
-            std::cerr << "Fail to open file";
-            system("pause");
-            exit(1);
-        }
-        string attachmentContent((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-        ifs.close();
-        string encodedAttachment = base64_encode(attachmentContent);
-
-        int lastEle = (int)encodedAttachment.size() - 1;
-        if (lastEle % 72 != 0) {
-            while (lastEle % 72 != 0) {
-                lastEle--;
-            }
-            for (int j = lastEle; j > 0; j -= 72) {
-                encodedAttachment.insert(j, "\r\n");
-            }
+            std::cerr << "Fail to send attachment " << filename[i] << endl;
+            filename.erase(filename.begin() + i);
+            i--;
         }
         else {
-            for (int j = lastEle - 72; j > 0; j -= 72) {
-                encodedAttachment.insert(j, "\r\n");
-            }
-        }
+            string attachmentContent((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+            ifs.close();
+            string encodedAttachment = base64_encode(attachmentContent);
 
-        encodedDataS.push_back(encodedAttachment);
+            int lastEle = (int)encodedAttachment.size() - 1;
+            if (lastEle % 72 != 0) {
+                while (lastEle % 72 != 0) {
+                    lastEle--;
+                }
+                for (int j = lastEle; j > 0; j -= 72) {
+                    encodedAttachment.insert(j, "\r\n");
+                }
+            }
+            else {
+                for (int j = lastEle - 72; j > 0; j -= 72) {
+                    encodedAttachment.insert(j, "\r\n");
+                }
+            }
+
+            encodedDataS.push_back(encodedAttachment);
+        }
     }
 
     return encodedDataS;
