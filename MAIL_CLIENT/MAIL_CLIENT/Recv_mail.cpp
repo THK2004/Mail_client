@@ -1,13 +1,28 @@
 #include "Recv_mail.h"
 
+using namespace std;
+
 void recv_mail(
+    Config configData,
     string user_addr,
     int pop3_server_port,
     string pop3_server_addr,
     string userMailAddr,
-    string password,
-    int mailOrderToRecv
+    string password
 ) {
+    //Create the user folder if not created;
+    createUserFolderAndItsSubFolder(user_addr);
+
+    //Check this user message already download up to present
+    ifstream ifs("Mailbox/" + user_addr + "/management.dat", std::ios::binary);
+    if (!ifs) {
+        std::cerr << "Cannot open management.dat\n";
+        throw exception();
+    }
+    int mesDownloadUpTo = 0;
+    ifs.read((char*)&mesDownloadUpTo, sizeof(int));
+    ifs.close();
+
     std::wstring stemp = std::wstring(pop3_server_addr.begin(), pop3_server_addr.end());
     LPCWSTR server_addr = stemp.c_str();
 
@@ -51,7 +66,7 @@ void recv_mail(
         system("pause");
         exit(1);
     }
-    std::cout << "SERVER: " << serverMessage;
+    //std::cout << "SERVER: " << serverMessage;
     memset(serverMessage, '\0', sizeof(serverMessage));
 
     //USER Command
@@ -60,9 +75,6 @@ void recv_mail(
     //PASSWORD Command
     std::string passCommand = "PASS " + password + "\r\n";
 
-    //RETR Command
-    std::string retrCommand = "RETR " + std::to_string(mailOrderToRecv) + "\r\n";
-
     vector<string> clientRequests = {
         "CAPA\r\n",
         userCommand,
@@ -70,7 +82,7 @@ void recv_mail(
         "STAT\r\n",
         "LIST\r\n",
         "UIDL\r\n",
-        retrCommand,
+        //retrCommand add later after check with server,
         "QUIT\r\n"
     };
 
@@ -87,10 +99,10 @@ void recv_mail(
             system("pause");
             exit(1);
         }
-        std::cout << "CLIENT: " << clientRequests[i];
+        //std::cout << "CLIENT: " << clientRequests[i];
 
         // Receive server's response
-        if (clientRequests[i].substr(0, 4) == "LIST") {
+        if (clientRequests[i].substr(0, 4) == "STAT") {
             if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
                 std::cerr << "Failed to receive server message." << std::endl;
                 closesocket(clientSocket);
@@ -99,7 +111,43 @@ void recv_mail(
                 exit(1);
             }
 
-            std::cout << "SERVER: " << serverMessage;
+            //std::cout << "SERVER: " << serverMessage;
+            stringstream ss(serverMessage);
+            string tmp;
+            ss >> tmp;
+            int totalMes = 0;
+            ss >> totalMes;
+            if (totalMes > mesDownloadUpTo) {
+                for (int i = totalMes; i >= mesDownloadUpTo + 1; i--) {
+                    clientRequests.insert(clientRequests.begin() + 6, "RETR " + std::to_string(i) + "\r\n");
+                }
+                numOfMessage = (int)clientRequests.size();
+                mesDownloadUpTo = totalMes;
+                ofstream ofs("Mailbox/" + user_addr + "/management.dat", std::ios::binary);
+                if (!ofs) {
+                    std::cerr << "Cannot open management.dat\n";
+                    throw exception();
+                }
+                ofs.write((char*)&mesDownloadUpTo, sizeof(int));
+                ofs.close();
+            }
+            else if (totalMes <= mesDownloadUpTo) {
+                clientRequests.erase(clientRequests.begin() + 5);
+                clientRequests.erase(clientRequests.begin() + 4);
+                numOfMessage = (int)clientRequests.size();
+            }
+            memset(serverMessage, '\0', sizeof(serverMessage));
+        }
+        else if (clientRequests[i].substr(0, 4) == "LIST") {
+            if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
+                std::cerr << "Failed to receive server message." << std::endl;
+                closesocket(clientSocket);
+                WSACleanup();
+                system("pause");
+                exit(1);
+            }
+
+            //std::cout << "SERVER: " << serverMessage;
 
             stringstream ss(serverMessage);
             string token;
@@ -126,7 +174,7 @@ void recv_mail(
                 exit(1);
             }
 
-            std::cout << "SERVER: " << serverMessage;
+            //std::cout << "SERVER: " << serverMessage;
 
             stringstream ss(serverMessage);
             string token;
@@ -173,7 +221,7 @@ void recv_mail(
                 }
             } while (bytesRead > 0);
 
-            std::cout << "SERVER: " << mailContent;
+            //std::cout << "SERVER: " << mailContent;
 
             //Get time to make file name
             auto now = std::chrono::system_clock::now();
@@ -208,26 +256,24 @@ void recv_mail(
                 mailContent.erase(mailContent.size() - 2);
             }
 
-            //Create a user folder if not created;
-            createUserFolderAndItsSubFolder(user_addr);
-
             //Create file path
             string path = "Mailbox/";
-            string filter = "Inbox/";
+            string filter = filtingMailContent(configData, mailContent);
             string filepath = path + user_addr + "/" + filter;
 
-            //Write down buffer to .msg file
+            //Write down mail contet to .msg file
             ofstream ofs(filepath + filename + ".msg");
             if (!ofs.is_open()) {
                 std::cerr << "Failed to open .msg file to write mail content down\n";
+                throw exception();
             }
 
             ofs << mailContent;
 
             ofs.close();
-            
-            //Save file from mail
-            savefiles(filepath, mailContent);
+
+            //Write mail short infomation to management.dat
+            writeToManagement(filepath, filename, mailContent);
         }
         else {
             if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
@@ -238,7 +284,7 @@ void recv_mail(
                 exit(1);
             }
 
-            std::cout << "SERVER: " << serverMessage;
+            //std::cout << "SERVER: " << serverMessage;
             memset(serverMessage, '\0', sizeof(serverMessage));
         }
     }
@@ -251,19 +297,44 @@ void createUserFolderAndItsSubFolder(string user_addr) {
     }
 
     if (CreateDirectoryW(folderpath.c_str(), NULL)) {
-        std::wcout << L"User folder created successfully." << std::endl;
+        //std::wcout << L"User folder created successfully." << std::endl;
+        std::string filepath;
+        size_t folderpath_len = folderpath.size();
+
+        for (int i = 0; i < folderpath_len; i++) {
+            if (folderpath[i] == L'\\' && i + 1 < folderpath_len && folderpath[i + 1] == L'\\') {
+                filepath += '/';
+                i++;
+            }
+            else {
+                filepath += static_cast<char>(folderpath[i]);
+            }
+        }
+
+        filepath += "/management.dat";
+        ofstream ofs(filepath, std::ios::binary);
+        if (!ofs) {
+            std::cout << "Can't create management.dat\n";
+            throw exception();
+        }
+        int mesDownloadUpTo = 0;
+        ofs.write((char*)&mesDownloadUpTo, sizeof(int));
+        ofs.close();
     }
     else {
         DWORD errorCode = GetLastError();
 
         if (errorCode == ERROR_ALREADY_EXISTS) {
-            std::wcout << L"User already exists." << std::endl;
+            //std::wcout << L"User already exists." << std::endl;
+            return;
         }
         else if (errorCode == ERROR_ACCESS_DENIED) {
-            std::wcout << L"Access denied. Insufficient permissions." << std::endl;
+            //std::wcout << L"Access denied. Insufficient permissions." << std::endl;
+            return;
         }
         else {
-            std::wcout << L"Failed to create user folder. Error code: " << errorCode << std::endl;
+            //std::wcout << L"Failed to create user folder. Error code: " << errorCode << std::endl;
+            return;
         }
     }
 
@@ -279,13 +350,37 @@ void createUserFolderAndItsSubFolder(string user_addr) {
         std::wstring subfolderpath = folderpath + L"\\" + subfolder[i];
 
         if (CreateDirectoryW(subfolderpath.c_str(), NULL)) {
-            std::wcout << subfolder[i] << L" created successfully." << std::endl;
+            //std::wcout << subfolder[i] << L" created successfully." << std::endl;
+            //Create management.dat file
+            std::string filepath;
+            size_t subfolderpath_len = subfolderpath.size();
+
+            for (int i = 0; i < subfolderpath_len; i++) {
+                if (subfolderpath[i] == L'\\' && i + 1 < subfolderpath_len && subfolderpath[i + 1] == L'\\') {
+                    filepath += '/';
+                    i++;
+                }
+                else {
+                    filepath += static_cast<char>(subfolderpath[i]);
+                }
+            }
+
+            filepath += "/management.dat";
+            ofstream ofs(filepath, std::ios::binary);
+            if (!ofs) {
+                std::cout << "Can't create management.dat\n";
+                throw exception();
+            }
+            ofs.close();
         }
         else {
             DWORD errorCode = GetLastError();
-            std::wcout << L"Failed to create folder " << subfolder[i] << L". Error code: " << errorCode << std::endl;
+            //std::wcout << L"Failed to create folder " << subfolder[i] << L". Error code: " << errorCode << std::endl;
         }
     }
+
+
+
 }
 
 std::string base64Decode(const std::string& base64String) {
@@ -323,7 +418,7 @@ std::string base64Decode(const std::string& base64String) {
     return decodedString;
 }
 
-void savefiles(string filepath, string mailContent) {
+void saveattachments(string mailContent) {
     vector<pair<string, size_t>> listOfAttachedFileNameAndTheirPos;         //list of filename include what after '.' (ex: .pdf)
 
     size_t pos = mailContent.find("Content-Disposition: attachment");
@@ -341,8 +436,12 @@ void savefiles(string filepath, string mailContent) {
     }
 
     size_t numOfAttachedFile = listOfAttachedFileNameAndTheirPos.size();
+    if (numOfAttachedFile == 0) {
+        std::cout << "There is no attached file.\n";
+        return;
+    }
 
-    std::cout << "\nThere is/are " << numOfAttachedFile << " attached item(s) in the mail:\n";
+    std::cout << "There is/are " << numOfAttachedFile << " attached item(s) in the mail:\n";
     for (int i = 0; i < numOfAttachedFile; i++) {
         std::cout << i + 1 << ". " << listOfAttachedFileNameAndTheirPos[i].first << endl;
     }
@@ -402,6 +501,7 @@ void savefiles(string filepath, string mailContent) {
 
                     ofs.close();
 
+                    std::cout << "Download completed, check MAIL_CLIENT/MAIL_CLIENT/Download.\n";
                     isLooping = 0;
                 }
             }
@@ -454,13 +554,14 @@ void savefiles(string filepath, string mailContent) {
 
                             if (!ofs) {
                                 cout << "Cannot open download file path";
-                                return;
+                                throw exception();
                             }
 
                             ofs << decodedBase64Data;
 
                             ofs.close();
 
+                            std::cout << "Download completed, check MAIL_CLIENT/MAIL_CLIENT/Download.\n";
                             isLooping = 0;
                         }
                     }
@@ -484,7 +585,7 @@ void savefiles(string filepath, string mailContent) {
                     attachmentToBeDownLoad.push_back(std::stoi(command.substr(previousPlusPos)));
                 }
             }
-            int numOfDownLoad = attachmentToBeDownLoad.size();
+            int numOfDownLoad = (int)attachmentToBeDownLoad.size();
             if (!isWrong) {
                 for (int i = 0; i < numOfDownLoad; i++) {
                     if (attachmentToBeDownLoad[i] > numOfAttachedFile) {
@@ -518,14 +619,13 @@ void savefiles(string filepath, string mailContent) {
 
                     if (!ofs) {
                         cout << "Cannot open download file path";
-                        return;
+                        throw exception();
                     }
 
                     ofs << decodedBase64Data;
-
-                    ofs.close();
+                    ofs.close(); 
                 }
-
+                std::cout << "Download completed, check MAIL_CLIENT/MAIL_CLIENT/Download.\n";
                 isLooping = 0;
             }
         }
@@ -542,4 +642,90 @@ std::string generateUniqueFileNameWhenDownload(const std::string& filename, cons
     }
 
     return uniqueName;
+}
+
+void writeToManagement(string filepath, string mailName, string mailContent) {
+    string mailPath = filepath + mailName + ".msg";
+
+    size_t pos = mailContent.find("From:") + sizeof("From:");
+    string sender = mailContent.substr(pos, mailContent.find('\n', pos + 1) - pos);
+    pos = mailContent.find("Subject:", pos + 1) + sizeof("Subject:");
+    string subject = mailContent.substr(pos, mailContent.find('\n', pos + 1) - pos);
+
+    Mail mail(0, mailPath.c_str(), sender.c_str(), subject.c_str());
+
+    ofstream ofs(filepath + "management.dat", std::ios::binary | std::ios::app);
+    if (!ofs) {
+        std::cerr << "Cannot open management.dat to write\n";
+        throw exception();
+    }
+    ofs.write((char*)&mail, sizeof(Mail));
+    ofs.close();
+}
+
+Mail::Mail() {
+    this->isRead = 0;
+    this->mailPath[0] = '\0';
+    this->sender[0] = '\0';
+    this->subject[0] = '\0';
+}
+
+Mail::Mail(bool isRead, const char* mailPath, const char* sender, const char* subject) {
+    this->isRead = isRead;
+    strcpy_s(this->mailPath, sizeof(this->mailPath), mailPath);
+    strcpy_s(this->sender, sizeof(this->sender), sender);
+    strcpy_s(this->subject, sizeof(this->subject), subject);
+}
+
+string filtingMailContent(Config configData, string mailContent) {
+    //toProject
+    size_t pos = mailContent.find("From:");
+    string sender = mailContent.substr(mailContent.find('<', pos) + 1, mailContent.find('>', pos) - mailContent.find('<') - 1);
+    
+    for (const string& A : configData.filter.toProject.first) {
+        if (sender == A) {
+            return configData.filter.toProject.second + '/';
+        }
+    }
+
+    //toImportant
+    pos = mailContent.find("Subject:", pos + 1) + sizeof("Subject:");
+    string subject = mailContent.substr(pos, mailContent.find('\n', pos + 1) - pos);
+
+    for (const string& A : configData.filter.toImportant.first) {
+        string toCheck = A.substr(1, A.size() - 2);
+        size_t importantCheck = subject.find(toCheck);
+        if (importantCheck != std::string::npos) {
+            return configData.filter.toImportant.second + '/';
+        }
+    }
+
+    //toWork
+    pos = mailContent.find("Content-Type: text/plain; charset=UTF-8; format=flowed", pos + 1);
+    pos = mailContent.find("\n\n", pos + 1) + 2;
+    string content = mailContent.substr(pos, mailContent.find("\n\n", pos) - pos);
+
+    for (const string& A : configData.filter.toWork.first) {
+        string toCheck = A.substr(1, A.size() - 2);
+        size_t workCheck = content.find(toCheck);
+        if (workCheck != std::string::npos) {
+            return configData.filter.toWork.second + '/';
+        }
+    }
+
+    //toSpam
+    for (const string& A : configData.filter.toSpam.first) {
+        string toCheck = A.substr(1, A.size() - 2);
+        size_t spamCheck = subject.find(toCheck);
+        if (spamCheck != std::string::npos) {
+            return configData.filter.toSpam.second + '/';
+        }
+        spamCheck = content.find(toCheck);
+        if (spamCheck != std::string::npos) {
+            return configData.filter.toSpam.second + '/';
+        }
+    }
+
+    //To Inbox
+    return "Inbox/";
 }
