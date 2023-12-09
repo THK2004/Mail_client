@@ -190,7 +190,7 @@ void mail_client(Config configData) {
 		}
 		else if (key == '3') {
 			std::cout << "3\n";
-			std::cout << "\nProgram exited\n";
+			std::cout << "\nWaiting for exiting\n";
 			isLooping = 0;
 		}
 		else{
@@ -249,7 +249,7 @@ void readMail(Config configData, string foldername, string mailboxMes) {
 		std::cout << endl;
 
 		while (true) {
-			std::cout << "Which mail do you want to read (press Enter to escape, or press 0 to review (and renew) mail list): ";
+			std::cout << "Which mail do you want to read (press Enter to escape, or 0 to review (and renew) mail list in this folder): ";
 			string tmp;
 			inputString(tmp);
 			if (tmp.empty()) {	//Enter pressed
@@ -370,7 +370,6 @@ void readMail(Config configData, string foldername, string mailboxMes) {
 			}
 		}
 		//Update read status
-		/*
 		ofstream ofs("Mailbox/" + configData.general.user_addr + "/" + foldername + "/management.dat", std::ios::binary);
 		if (!ofs) {
 			std::cerr << "Canonot open management.dat\n";
@@ -380,7 +379,7 @@ void readMail(Config configData, string foldername, string mailboxMes) {
 			ofs.write((char*)&listOfMail[i], sizeof(Mail));
 		}
 		ofs.close();
-		*/
+
 	}
 	else {	//numOfMail <= 0
 		std::cout << "There is no mail found here.!\n";

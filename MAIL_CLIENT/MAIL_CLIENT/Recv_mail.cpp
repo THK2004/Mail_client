@@ -2,19 +2,12 @@
 
 using namespace std;
 
-void recv_mail(
-    Config configData,
-    string user_addr,
-    int pop3_server_port,
-    string pop3_server_addr,
-    string userMailAddr,
-    string password
-) {
+void recv_mail(Config configData) {
     //Create the user folder if not created;
-    createUserFolderAndItsSubFolder(user_addr);
+    createUserFolderAndItsSubFolder(configData.general.user_addr);
 
     //Check this user message already download up to present
-    ifstream ifs("Mailbox/" + user_addr + "/management.dat", std::ios::binary);
+    ifstream ifs("Mailbox/" + configData.general.user_addr + "/management.dat", std::ios::binary);
     if (!ifs) {
         std::cerr << "Cannot open management.dat\n";
         throw exception();
@@ -23,7 +16,7 @@ void recv_mail(
     ifs.read((char*)&mesDownloadUpTo, sizeof(int));
     ifs.close();
 
-    std::wstring stemp = std::wstring(pop3_server_addr.begin(), pop3_server_addr.end());
+    std::wstring stemp = std::wstring(configData.general.server_addr.begin(), configData.general.server_addr.end());
     LPCWSTR server_addr = stemp.c_str();
 
     // Initialize Winsock
@@ -44,7 +37,7 @@ void recv_mail(
     // Connect to the SMTP server
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(pop3_server_port);  // POP3 port
+    serverAddress.sin_port = htons(configData.general.pop3Server_port);  // POP3 port
     InetPton(AF_INET, server_addr, &serverAddress.sin_addr.s_addr);  // POP3 server address
 
     if (connect(clientSocket, (sockaddr*)(&serverAddress), sizeof(serverAddress)) == SOCKET_ERROR) {
@@ -70,10 +63,10 @@ void recv_mail(
     memset(serverMessage, '\0', sizeof(serverMessage));
 
     //USER Command
-    std::string userCommand = "USER " + userMailAddr + "\r\n";
+    std::string userCommand = "USER " + configData.general.user_addr + "\r\n";
 
     //PASSWORD Command
-    std::string passCommand = "PASS " + password + "\r\n";
+    std::string passCommand = "PASS " + configData.general.password + "\r\n";
 
     vector<string> clientRequests = {
         "CAPA\r\n",
@@ -110,8 +103,8 @@ void recv_mail(
                 system("pause");
                 exit(1);
             }
-
             //std::cout << "SERVER: " << serverMessage;
+
             stringstream ss(serverMessage);
             string tmp;
             ss >> tmp;
@@ -123,7 +116,7 @@ void recv_mail(
                 }
                 numOfMessage = (int)clientRequests.size();
                 mesDownloadUpTo = totalMes;
-                ofstream ofs("Mailbox/" + user_addr + "/management.dat", std::ios::binary);
+                ofstream ofs("Mailbox/" + configData.general.user_addr + "/management.dat", std::ios::binary);
                 if (!ofs) {
                     std::cerr << "Cannot open management.dat\n";
                     throw exception();
@@ -160,9 +153,6 @@ void recv_mail(
                     mailOrderAndItsByte.push_back(std::make_pair(mailOrder, itsBtye));
                 }
             }
-            //for (int i = 0; i < mailOrderAndItsByte.size(); i++) {
-            //    cout << mailOrderAndItsByte[i].first << " " << mailOrderAndItsByte[i].second << endl;
-            //}
             memset(serverMessage, '\0', sizeof(serverMessage));
         }
         else if (clientRequests[i].substr(0, 4) == "UIDL") {
@@ -187,13 +177,10 @@ void recv_mail(
                     mailOrderAndItsName.push_back(std::make_pair(mailOrder, itsName));
                 }
             }
-            //for (int i = 0; i < mailOrderAndItsName.size(); i++) {
-            //    cout << mailOrderAndItsName[i].first << " " << mailOrderAndItsName[i].second << endl;
-            //}
+
             memset(serverMessage, '\0', sizeof(serverMessage));
         }
         else if (clientRequests[i].substr(0, 4) == "RETR") {
-            //string mailOrder = clientRequests[i].substr(clientRequests[i].find(' ') + 1, clientRequests[i].size() - 1);
             char buffer[BUFFER_SIZE];
             int bytesRead = 0;
             string mailContent;
@@ -259,7 +246,7 @@ void recv_mail(
             //Create file path
             string path = "Mailbox/";
             string filter = filtingMailContent(configData, mailContent);
-            string filepath = path + user_addr + "/" + filter;
+            string filepath = path + configData.general.user_addr + "/" + filter;
 
             //Write down mail contet to .msg file
             ofstream ofs(filepath + filename + ".msg");
@@ -274,6 +261,9 @@ void recv_mail(
 
             //Write mail short infomation to management.dat
             writeToManagement(filepath, filename, mailContent);
+
+            //Sleep for 1.5 second
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
         }
         else {
             if (recv(clientSocket, serverMessage, sizeof(serverMessage), 0) == SOCKET_ERROR) {
@@ -374,13 +364,10 @@ void createUserFolderAndItsSubFolder(string user_addr) {
             ofs.close();
         }
         else {
-            DWORD errorCode = GetLastError();
+            //DWORD errorCode = GetLastError();
             //std::wcout << L"Failed to create folder " << subfolder[i] << L". Error code: " << errorCode << std::endl;
         }
     }
-
-
-
 }
 
 std::string base64Decode(const std::string& base64String) {

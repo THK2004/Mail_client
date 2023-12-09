@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Config>
 	<General>
-		<UserName> Khanh Tran&lt;sender@fit.hcmus.edu.vn&gt;</UserName>
+		<UserName> Khanh Tran&lt;receiver@yahoo.com.vn&gt;</UserName>
 		<Password> 123456789</Password>
 		<MailServer> 127.0.0.1</MailServer>
 		<SMTP> 2500</SMTP>

@@ -6,6 +6,7 @@
 #include <chrono>
 #include <WinSock2.h>
 #include <Ws2tcpip.h>
+#include <thread>   //For a specific time we need to check mail server
 
 class Mail {
 public:
@@ -17,14 +18,7 @@ public:
     Mail(bool, const char*, const char*, const char*);
 };
 
-void recv_mail(
-    Config configData,
-    string user_addr,
-    int pop3_server_port,
-    string pop3_server_addr,
-    string userMailAddr,
-    string password
-);
+void recv_mail(Config configData);
 
 void createUserFolderAndItsSubFolder(string user_addr);
 std::string base64Decode(const std::string& base64String);
