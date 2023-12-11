@@ -342,7 +342,18 @@ void readMail(Config configData, string foldername, string mailboxMes) {
 
 					size_t pos = fullMail.find("Content-Type: text/plain; charset=UTF-8; format=flowed");
 					pos = fullMail.find("\n\n", pos + 1) + 2;
-					content = fullMail.substr(pos, fullMail.find("\n\n", pos) - pos);
+					//If there any attachment
+					if (fullMail.find("Content-Disposition: attachment", pos + 1) != std::string::npos) {
+						content = fullMail.substr(pos, fullMail.find("\n--", pos) - pos);
+					}
+					else {
+						content = fullMail.substr(pos);
+						size_t pos_ = content.find("\n--");
+						if (pos_ != std::string::npos && content.find("--\n", pos_ + 3) != std::string::npos) {
+							content = content.substr(0, pos_);
+						}
+						content.pop_back();
+					}
 					std::cout << "Mail no." << option << "'s content is:\n";
 					std::cout << from << endl;
 					if (to.size() > 4)
