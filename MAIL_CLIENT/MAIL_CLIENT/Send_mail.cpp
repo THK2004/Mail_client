@@ -16,6 +16,20 @@ void send_mail(
     int ccReceivers = (int)ccReceiver.size();
     int bccReceivers = (int)bccReceiver.size();
 
+    //get data
+    vector<string> encodedDataS = getEncodedData(filename);
+    int filenames = (int)filename.size();
+
+    for (int i = 0; i < filenames; i++) {
+        if (calBase64EncodedSize_bytes(encodedDataS[i]) > 1048576 * 3) {
+            std::cout << "Oops! The " + filename[i] + " exceeding 3MB failed to be sent." << std::endl;
+            encodedDataS.erase(encodedDataS.begin() + i);
+            filename.erase(filename.begin() + i);
+            filenames = (int)filename.size();
+            i--;
+        }
+    }
+
     std::wstring stemp = std::wstring(smtp_server_addr.begin(), smtp_server_addr.end());
     LPCWSTR server_addr = stemp.c_str();
 
@@ -60,16 +74,6 @@ void send_mail(
     }
     //std::cout << "SERVER: " << serverMessage;
     memset(serverMessage, '\0', sizeof(serverMessage));
-
-    //get data
-    vector<string> encodedDataS = getEncodedData(filename);
-    int filenames = (int)filename.size();
-
-    for (int i = 0; i < filenames; i++) {
-        if (calBase64EncodedSize_bytes(encodedDataS[i]) > 1048576) {
-            std::cout << "Oops! The " + filename[i] + " exceeds 1MB." << std::endl;
-        }
-    }
 
     //MailFromCommand
     string EHLOCommand = "EHLO " + smtp_server_addr + "\r\n";

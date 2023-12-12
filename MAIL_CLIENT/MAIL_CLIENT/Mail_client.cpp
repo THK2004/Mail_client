@@ -82,6 +82,9 @@ void mail_client(Config configData) {
 				string subject;
 				std::cout << "Subject: ";
 				inputString(subject);
+				if (subject.empty()) {
+					subject = "<No subject>";
+				}
 				string content;
 				std::cout << "(Enter your mail content, end with a line containing only '.')\n";
 				std::cout << "Content:\n";
